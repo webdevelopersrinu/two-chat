@@ -11,6 +11,7 @@ dotenv.config();
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // Initialize express app
 const app = express();
@@ -34,9 +35,10 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/users', userRoutes);
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/twouserchat', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/multiuserchat', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
@@ -51,49 +53,91 @@ io.on('connection', (socket) => {
 
   socket.on('user_connected', (userId) => {
     users.set(userId, socket.id);
+    socket.userId = userId;
+    
+    // Notify all users about online status
     io.emit('users_online', Array.from(users.keys()));
   });
 
+  socket.on('join_conversation', (conversationId) => {
+    socket.join(conversationId);
+  });
+
+  socket.on('leave_conversation', (conversationId) => {
+    socket.leave(conversationId);
+  });
+
   socket.on('send_message', async (data) => {
-    const { senderId, receiverId, message } = data;
+    const { senderId, receiverId, message, conversationId } = data;
     
     // Save message to database
     const Message = require('./models/Message');
-    const newMessage = new Message({
-      sender: senderId,
-      receiver: receiverId,
-      message: message,
-      timestamp: new Date()
-    });
+    const Conversation = require('./models/Conversation');
     
-    await newMessage.save();
-    
-    // Send to receiver if online
-    const receiverSocketId = users.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('receive_message', {
+    try {
+      // Find or create conversation
+      let conversation = await Conversation.findById(conversationId);
+      
+      if (!conversation) {
+        conversation = await Conversation.findOne({
+          participants: { $all: [senderId, receiverId] }
+        });
+        
+        if (!conversation) {
+          conversation = new Conversation({
+            participants: [senderId, receiverId]
+          });
+          await conversation.save();
+        }
+      }
+      
+      const newMessage = new Message({
+        sender: senderId,
+        conversation: conversation._id,
+        message: message,
+        timestamp: new Date()
+      });
+      
+      await newMessage.save();
+      
+      // Update conversation's last message
+      conversation.lastMessage = newMessage._id;
+      conversation.lastActivity = new Date();
+      await conversation.save();
+      
+      // Send to all users in the conversation
+      io.to(conversation._id.toString()).emit('receive_message', {
         _id: newMessage._id,
         sender: senderId,
+        conversation: conversation._id,
         message: message,
         timestamp: newMessage.timestamp
       });
+      
+      // Also send to receiver's socket if online
+      const receiverSocketId = users.get(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('new_message_notification', {
+          conversationId: conversation._id,
+          message: newMessage,
+          senderName: data.senderName
+        });
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      socket.emit('message_error', { error: 'Failed to send message' });
     }
-    
-    // Send confirmation to sender
-    socket.emit('message_sent', {
-      _id: newMessage._id,
-      timestamp: newMessage.timestamp
-    });
+  });
+
+  socket.on('typing', ({ conversationId, userId, isTyping }) => {
+    socket.to(conversationId).emit('user_typing', { userId, isTyping });
   });
 
   socket.on('disconnect', () => {
     // Remove user from online users
-    for (const [userId, socketId] of users.entries()) {
-      if (socketId === socket.id) {
-        users.delete(userId);
-        io.emit('users_online', Array.from(users.keys()));
-        break;
-      }
+    if (socket.userId) {
+      users.delete(socket.userId);
+      io.emit('users_online', Array.from(users.keys()));
     }
     console.log('User disconnected:', socket.id);
   });

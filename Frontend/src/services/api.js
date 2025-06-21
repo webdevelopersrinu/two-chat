@@ -24,14 +24,28 @@ api.interceptors.request.use(
 )
 
 export const authService = {
-  register: (username, password) => api.post('/auth/register', { username, password }),
-  login: (username, password) => api.post('/auth/login', { username, password }),
-  logout: () => api.post('/auth/logout')
+  register: (username, displayName, password) => 
+    api.post('/auth/register', { username, displayName, password }),
+  login: (username, password) => 
+    api.post('/auth/login', { username, password }),
+  logout: () => api.post('/auth/logout'),
+  getMe: () => api.get('/auth/me')
+}
+
+export const userService = {
+  searchUsers: (query) => api.get('/users/search', { params: { query } }),
+  getUserById: (userId) => api.get(`/users/${userId}`),
+  updateProfile: (data) => api.put('/users/profile', data)
 }
 
 export const chatService = {
-  getMessages: (otherUserId) => api.get(`/chat/messages/${otherUserId}`),
-  getOtherUser: () => api.get('/chat/other-user')
+  getConversations: () => api.get('/chat/conversations'),
+  getOrCreateConversation: (otherUserId) => 
+    api.get(`/chat/conversation/${otherUserId}`),
+  getMessages: (conversationId, page = 1) => 
+    api.get(`/chat/messages/${conversationId}`, { params: { page } }),
+  markAsRead: (conversationId) => 
+    api.put(`/chat/messages/${conversationId}/read`)
 }
 
 export default api

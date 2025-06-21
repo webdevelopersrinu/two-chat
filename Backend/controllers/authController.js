@@ -11,19 +11,10 @@ const generateToken = (userId) => {
 // Register controller
 exports.register = async (req, res) => {
   try {
-    const { username, password } = req.body;
-
-    // Check if two users already exist
-    const userCount = await User.countDocuments();
-    if (userCount >= 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Maximum number of users (2) already registered'
-      });
-    }
+    const { username, displayName, password } = req.body;
 
     // Check if username already exists
-    const existingUser = await User.findOne({ username });
+    const existingUser = await User.findOne({ username: username.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -32,7 +23,11 @@ exports.register = async (req, res) => {
     }
 
     // Create new user
-    const user = new User({ username, password });
+    const user = new User({ 
+      username: username.toLowerCase(), 
+      displayName,
+      password 
+    });
     await user.save();
 
     // Generate token
@@ -44,7 +39,10 @@ exports.register = async (req, res) => {
       token,
       user: {
         id: user._id,
-        username: user.username
+        username: user.username,
+        displayName: user.displayName,
+        avatar: user.avatar,
+        bio: user.bio
       }
     });
   } catch (error) {
@@ -63,7 +61,7 @@ exports.login = async (req, res) => {
     const { username, password } = req.body;
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: username.toLowerCase() });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -80,6 +78,9 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Update last seen
+    await user.updateLastSeen();
+
     // Generate token
     const token = generateToken(user._id);
 
@@ -89,7 +90,10 @@ exports.login = async (req, res) => {
       token,
       user: {
         id: user._id,
-        username: user.username
+        username: user.username,
+        displayName: user.displayName,
+        avatar: user.avatar,
+        bio: user.bio
       }
     });
   } catch (error) {
@@ -104,9 +108,32 @@ exports.login = async (req, res) => {
 
 // Logout controller
 exports.logout = async (req, res) => {
-  // Since we're using JWT, logout is handled on the client side
   res.json({
     success: true,
     message: 'Logout successful'
   });
+};
+
+// Get current user
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user',
+      error: error.message
+    });
+  }
 };

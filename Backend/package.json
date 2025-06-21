@@ -1,7 +1,7 @@
 {
   "name": "chat-backend",
   "version": "1.0.0",
-  "description": "Two-user chat application backend",
+  "description": "Multi-user chat application backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

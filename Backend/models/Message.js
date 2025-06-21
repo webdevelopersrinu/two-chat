@@ -6,9 +6,9 @@ const messageSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  receiver: {
+  conversation: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Conversation',
     required: true
   },
   message: {
@@ -23,6 +23,13 @@ const messageSchema = new mongoose.Schema({
   read: {
     type: Boolean,
     default: false
+  },
+  edited: {
+    type: Boolean,
+    default: false
+  },
+  editedAt: {
+    type: Date
   }
 });
 

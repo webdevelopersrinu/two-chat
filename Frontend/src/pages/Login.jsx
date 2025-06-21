@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 function Login() {
   const [isLogin, setIsLogin] = useState(true)
   const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -19,7 +20,7 @@ function Login() {
     try {
       const response = isLogin 
         ? await authService.login(username, password)
-        : await authService.register(username, password)
+        : await authService.register(username, displayName, password)
 
       if (response.data.success) {
         login(response.data.token, response.data.user)
@@ -37,7 +38,7 @@ function Login() {
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-center justify-center p-4">
       <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
         <h1 className="text-4xl font-bold text-white text-center mb-8">
-          {isLogin ? 'Welcome Back!' : 'Join the Chat'}
+          {isLogin ? 'Welcome Back!' : 'Join the Community'}
         </h1>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -52,6 +53,20 @@ function Login() {
               minLength={3}
             />
           </div>
+          
+          {!isLogin && (
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Display Name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300"
+                required
+                minLength={3}
+              />
+            </div>
+          )}
           
           <div className="relative">
             <input
@@ -82,10 +97,6 @@ function Login() {
           >
             {isLogin ? 'Register' : 'Login'}
           </button>
-        </p>
-        
-        <p className="text-white/60 text-center text-sm mt-4">
-          Only 2 users can register in this chat app
         </p>
       </div>
     </div>

@@ -8,12 +8,34 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     minlength: 3,
+    maxlength: 30,
+    lowercase: true,
+    index: true
+  },
+  displayName: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 3,
     maxlength: 30
   },
   password: {
     type: String,
     required: true,
     minlength: 6
+  },
+  avatar: {
+    type: String,
+    default: null
+  },
+  bio: {
+    type: String,
+    maxlength: 200,
+    default: ''
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
   },
   createdAt: {
     type: Date,
@@ -37,6 +59,12 @@ userSchema.pre('save', async function(next) {
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Update last seen
+userSchema.methods.updateLastSeen = async function() {
+  this.lastSeen = new Date();
+  return this.save();
 };
 
 module.exports = mongoose.model('User', userSchema);
