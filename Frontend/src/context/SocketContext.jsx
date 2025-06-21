@@ -64,6 +64,16 @@ export const SocketProvider = ({ children }) => {
     }
   }, [user])
 
+  const notifyNewConversation = (conversationId, participants) => {
+    if (socketRef.current) {
+      console.log('Emitting new conversation:', conversationId)
+      socketRef.current.emit('new_conversation_created', {
+        conversationId,
+        participants
+      })
+    }
+  }
+
   const joinConversation = (conversationId) => {
     if (socketRef.current && conversationId) {
       console.log('Joining conversation:', conversationId)
@@ -106,7 +116,8 @@ export const SocketProvider = ({ children }) => {
     sendMessage,
     emitTyping,
     isUserOnline,
-    onlineUsers
+    onlineUsers,
+    notifyNewConversation
   }
 
   return (

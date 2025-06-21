@@ -49,6 +49,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/multiuser
 // Socket.IO connection handling
 const users = new Map();
 
+global.io = io;
+global.users = users;
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -56,7 +59,7 @@ io.on('connection', (socket) => {
     users.set(userId, socket.id);
     socket.userId = userId;
     console.log(`User ${userId} connected with socket ${socket.id}`);
-    
+
     // Notify all users about online status
     io.emit('users_online', Array.from(users.keys()));
   });
@@ -74,21 +77,21 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     const { senderId, receiverId, message, conversationId, tempId, senderName } = data;
     console.log(`Message from ${senderId} to ${receiverId} in conversation ${conversationId}`);
-    
+
     try {
       // Save message to database
       const Message = require('./models/Message');
       const Conversation = require('./models/Conversation');
-      
+
       // Find conversation
       let conversation = await Conversation.findById(conversationId);
-      
+
       if (!conversation) {
         console.log('Conversation not found, creating new one');
         conversation = await Conversation.findOne({
           participants: { $all: [senderId, receiverId] }
         });
-        
+
         if (!conversation) {
           conversation = new Conversation({
             participants: [senderId, receiverId]
@@ -96,7 +99,7 @@ io.on('connection', (socket) => {
           await conversation.save();
         }
       }
-      
+
       // Create and save message
       const newMessage = new Message({
         sender: senderId,
@@ -104,17 +107,17 @@ io.on('connection', (socket) => {
         message: message,
         timestamp: new Date()
       });
-      
+
       await newMessage.save();
-      
+
       // Populate sender info
       await newMessage.populate('sender', 'username displayName avatar');
-      
+
       // Update conversation's last message
       conversation.lastMessage = newMessage._id;
       conversation.lastActivity = new Date();
       await conversation.save();
-      
+
       // Create message data object
       const messageData = {
         _id: newMessage._id.toString(),
@@ -123,18 +126,18 @@ io.on('connection', (socket) => {
         message: message,
         timestamp: newMessage.timestamp
       };
-      
+
       console.log(`Emitting message to conversation room: ${conversation._id.toString()}`);
-      
+
       // Emit to all sockets in the conversation room (including sender)
       io.to(conversation._id.toString()).emit('receive_message', messageData);
-      
+
       // Also emit directly to receiver's socket if they're online but not in the room
       const receiverSocketId = users.get(receiverId);
       if (receiverSocketId) {
         console.log(`Also sending directly to receiver socket: ${receiverSocketId}`);
         io.to(receiverSocketId).emit('receive_message', messageData);
-        
+
         // Send notification
         io.to(receiverSocketId).emit('new_message_notification', {
           conversationId: conversation._id.toString(),
@@ -142,10 +145,48 @@ io.on('connection', (socket) => {
           senderName: senderName
         });
       }
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
       socket.emit('message_error', { error: 'Failed to send message', tempId });
+    }
+  });
+
+  socket.on('new_conversation_created', async (data) => {
+    const { conversationId, participants } = data;
+
+    console.log('New conversation created:', conversationId);
+
+    try {
+      // Get the full conversation data
+      const Conversation = require('./models/Conversation');
+      const conversation = await Conversation.findById(conversationId)
+        .populate('participants', 'username displayName avatar lastSeen')
+        .populate({
+          path: 'lastMessage',
+          populate: {
+            path: 'sender',
+            select: 'username displayName'
+          }
+        });
+
+      if (!conversation) {
+        console.error('Conversation not found');
+        return;
+      }
+
+      // Notify all participants about the new conversation
+      participants.forEach(participantId => {
+        const participantSocketId = users.get(participantId);
+        if (participantSocketId && participantSocketId !== socket.id) {
+          console.log(`Notifying participant ${participantId} about new conversation`);
+          io.to(participantSocketId).emit('new_conversation', {
+            conversation: conversation
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error broadcasting new conversation:', error);
     }
   });
 

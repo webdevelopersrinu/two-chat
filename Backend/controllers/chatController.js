@@ -35,10 +35,12 @@ exports.getConversations = async (req, res) => {
 };
 
 // Get or create a conversation
+// In your chatController.js
 exports.getOrCreateConversation = async (req, res) => {
   try {
     const userId = req.userId;
     const { otherUserId } = req.params;
+    let isNewConversation = false;
 
     // Check if conversation exists
     let conversation = await Conversation.findOne({
@@ -55,6 +57,7 @@ exports.getOrCreateConversation = async (req, res) => {
 
     if (!conversation) {
       // Create new conversation
+      isNewConversation = true;
       conversation = new Conversation({
         participants: [userId, otherUserId]
       });
@@ -67,8 +70,25 @@ exports.getOrCreateConversation = async (req, res) => {
 
     res.json({
       success: true,
-      conversation
+      conversation,
+      isNew: isNewConversation
     });
+
+    // If it's a new conversation, notify via socket from backend
+    if (isNewConversation && global.io) {
+      // Emit to all participants
+      const io = global.io;
+      const users = global.users; // You'll need to make these global
+      
+      conversation.participants.forEach(participant => {
+        const socketId = users.get(participant._id.toString());
+        if (socketId) {
+          io.to(socketId).emit('new_conversation', {
+            conversation: conversation
+          });
+        }
+      });
+    }
   } catch (error) {
     console.error('Get/create conversation error:', error);
     res.status(500).json({

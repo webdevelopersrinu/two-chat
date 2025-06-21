@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { chatService } from '../services/api'
+import { useSocket } from '../context/SocketContext'
 import ConversationList from '../components/ConversationList'
 import ChatWindow from '../components/ChatWindow'
 import UserSearch from '../components/UserSearch'
@@ -15,10 +16,44 @@ function Chat() {
   const [showSearch, setShowSearch] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showMobileSidebar, setShowMobileSidebar] = useState(false)
+  const { socket } = useSocket()
 
   useEffect(() => {
     loadConversations()
   }, [])
+
+  useEffect(() => {
+    if (!socket) return
+
+    const handleNewConversation = ({ conversation }) => {
+      console.log('New conversation received:', conversation)
+
+      // Add the new conversation to the list
+      setConversations(prev => {
+        // Check if conversation already exists
+        const exists = prev.some(c => c._id === conversation._id)
+        if (exists) return prev
+
+        // Add new conversation at the top
+        return [conversation, ...prev]
+      })
+
+      // Show notification
+      const otherUser = conversation.participants.find(p => p._id !== user.id)
+      if (otherUser) {
+        toast(`${otherUser.displayName} started a conversation with you!`, {
+          icon: '💬',
+          duration: 5000
+        })
+      }
+    }
+
+    socket.on('new_conversation', handleNewConversation)
+
+    return () => {
+      socket.off('new_conversation', handleNewConversation)
+    }
+  }, [socket, user.id])
 
   const loadConversations = async () => {
     try {
@@ -32,18 +67,29 @@ function Chat() {
       setLoading(false)
     }
   }
-
+  
   const handleSelectUser = async (selectedUser) => {
     try {
       const response = await chatService.getOrCreateConversation(selectedUser._id)
       if (response.data.success) {
-        setSelectedConversation(response.data.conversation)
+        const conversation = response.data.conversation
+        setSelectedConversation(conversation)
         setShowSearch(false)
         setShowMobileSidebar(false)
-        
-        const exists = conversations.find(c => c._id === response.data.conversation._id)
+
+        // Check if this is a new conversation
+        const exists = conversations.find(c => c._id === conversation._id)
         if (!exists) {
-          setConversations([response.data.conversation, ...conversations])
+          // Add to local conversations
+          setConversations([conversation, ...conversations])
+
+          // Notify other participants about the new conversation
+          if (socket) {
+            socket.emit('new_conversation_created', {
+              conversationId: conversation._id,
+              participants: conversation.participants.map(p => p._id || p)
+            })
+          }
         }
       }
     } catch (error) {
@@ -53,8 +99,8 @@ function Chat() {
 
   const updateConversationList = (conversationId, lastMessage) => {
     setConversations(prev => {
-      const updated = prev.map(conv => 
-        conv._id === conversationId 
+      const updated = prev.map(conv =>
+        conv._id === conversationId
           ? { ...conv, lastMessage, lastActivity: new Date() }
           : conv
       )
@@ -102,9 +148,9 @@ function Chat() {
                 </svg>
               </button>
             </div>
-            
+
             {showSearch && (
-              <UserSearch 
+              <UserSearch
                 onSelectUser={handleSelectUser}
                 onClose={() => setShowSearch(false)}
               />
