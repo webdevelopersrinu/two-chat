@@ -42,9 +42,10 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/multiuser
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
+// Socket.IO connection handling
 // Socket.IO connection handling
 const users = new Map();
 
@@ -54,6 +55,7 @@ io.on('connection', (socket) => {
   socket.on('user_connected', (userId) => {
     users.set(userId, socket.id);
     socket.userId = userId;
+    console.log(`User ${userId} connected with socket ${socket.id}`);
     
     // Notify all users about online status
     io.emit('users_online', Array.from(users.keys()));
@@ -61,24 +63,28 @@ io.on('connection', (socket) => {
 
   socket.on('join_conversation', (conversationId) => {
     socket.join(conversationId);
+    console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
   });
 
   socket.on('leave_conversation', (conversationId) => {
     socket.leave(conversationId);
+    console.log(`Socket ${socket.id} left conversation ${conversationId}`);
   });
 
   socket.on('send_message', async (data) => {
-    const { senderId, receiverId, message, conversationId } = data;
-    
-    // Save message to database
-    const Message = require('./models/Message');
-    const Conversation = require('./models/Conversation');
+    const { senderId, receiverId, message, conversationId, tempId, senderName } = data;
+    console.log(`Message from ${senderId} to ${receiverId} in conversation ${conversationId}`);
     
     try {
-      // Find or create conversation
+      // Save message to database
+      const Message = require('./models/Message');
+      const Conversation = require('./models/Conversation');
+      
+      // Find conversation
       let conversation = await Conversation.findById(conversationId);
       
       if (!conversation) {
+        console.log('Conversation not found, creating new one');
         conversation = await Conversation.findOne({
           participants: { $all: [senderId, receiverId] }
         });
@@ -91,6 +97,7 @@ io.on('connection', (socket) => {
         }
       }
       
+      // Create and save message
       const newMessage = new Message({
         sender: senderId,
         conversation: conversation._id,
@@ -100,32 +107,45 @@ io.on('connection', (socket) => {
       
       await newMessage.save();
       
+      // Populate sender info
+      await newMessage.populate('sender', 'username displayName avatar');
+      
       // Update conversation's last message
       conversation.lastMessage = newMessage._id;
       conversation.lastActivity = new Date();
       await conversation.save();
       
-      // Send to all users in the conversation
-      io.to(conversation._id.toString()).emit('receive_message', {
-        _id: newMessage._id,
-        sender: senderId,
-        conversation: conversation._id,
+      // Create message data object
+      const messageData = {
+        _id: newMessage._id.toString(),
+        sender: newMessage.sender,
+        conversation: conversation._id.toString(),
         message: message,
         timestamp: newMessage.timestamp
-      });
+      };
       
-      // Also send to receiver's socket if online
+      console.log(`Emitting message to conversation room: ${conversation._id.toString()}`);
+      
+      // Emit to all sockets in the conversation room (including sender)
+      io.to(conversation._id.toString()).emit('receive_message', messageData);
+      
+      // Also emit directly to receiver's socket if they're online but not in the room
       const receiverSocketId = users.get(receiverId);
       if (receiverSocketId) {
+        console.log(`Also sending directly to receiver socket: ${receiverSocketId}`);
+        io.to(receiverSocketId).emit('receive_message', messageData);
+        
+        // Send notification
         io.to(receiverSocketId).emit('new_message_notification', {
-          conversationId: conversation._id,
-          message: newMessage,
-          senderName: data.senderName
+          conversationId: conversation._id.toString(),
+          message: messageData,
+          senderName: senderName
         });
       }
+      
     } catch (error) {
       console.error('Error sending message:', error);
-      socket.emit('message_error', { error: 'Failed to send message' });
+      socket.emit('message_error', { error: 'Failed to send message', tempId });
     }
   });
 
@@ -138,8 +158,8 @@ io.on('connection', (socket) => {
     if (socket.userId) {
       users.delete(socket.userId);
       io.emit('users_online', Array.from(users.keys()));
+      console.log(`User ${socket.userId} disconnected`);
     }
-    console.log('User disconnected:', socket.id);
   });
 });
 

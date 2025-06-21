@@ -36,19 +36,19 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
-        <h1 className="text-4xl font-bold text-white text-center mb-8">
+      <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-md animate-fade-in">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white text-center mb-6 sm:mb-8">
           {isLogin ? 'Welcome Back!' : 'Join the Community'}
         </h1>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="relative">
             <input
               type="text"
               placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300 text-sm sm:text-base"
               required
               minLength={3}
             />
@@ -61,7 +61,7 @@ function Login() {
                 placeholder="Display Name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300"
+                className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300 text-sm sm:text-base"
                 required
                 minLength={3}
               />
@@ -74,7 +74,7 @@ function Login() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300"
+              className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300 text-sm sm:text-base"
               required
               minLength={6}
             />
@@ -83,13 +83,13 @@ function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-white text-purple-600 font-semibold rounded-xl hover:bg-white/90 transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-white text-purple-600 font-semibold rounded-xl hover:bg-white/90 transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {loading ? 'Loading...' : (isLogin ? 'Login' : 'Register')}
           </button>
         </form>
         
-        <p className="text-white/80 text-center mt-6">
+        <p className="text-white/80 text-center mt-4 sm:mt-6 text-sm sm:text-base">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button
             onClick={() => setIsLogin(!isLogin)}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from './AuthContext'
 import toast from 'react-hot-toast'
@@ -16,14 +16,17 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth()
   const socketRef = useRef()
-  const onlineUsersRef = useRef(new Set())
+  const [onlineUsers, setOnlineUsers] = useState([])
 
   useEffect(() => {
     if (!user) return
 
     // Initialize socket connection
     socketRef.current = io('http://localhost:5000', {
-      transports: ['websocket']
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     })
 
     // Connect user
@@ -31,15 +34,29 @@ export const SocketProvider = ({ children }) => {
 
     // Listen for online users
     socketRef.current.on('users_online', (users) => {
-      onlineUsersRef.current = new Set(users)
+      setOnlineUsers(users)
     })
 
     // Listen for new message notifications
     socketRef.current.on('new_message_notification', ({ conversationId, message, senderName }) => {
-      toast(`New message from ${senderName}`, {
-        icon: '💬',
-        duration: 4000
-      })
+      // Only show notification if not in the conversation
+      const currentPath = window.location.pathname
+      if (!currentPath.includes(conversationId)) {
+        toast(`New message from ${senderName}`, {
+          icon: '💬',
+          duration: 4000
+        })
+      }
+    })
+
+    // Connection event handlers
+    socketRef.current.on('connect', () => {
+      console.log('Socket connected')
+      socketRef.current.emit('user_connected', user.id)
+    })
+
+    socketRef.current.on('disconnect', () => {
+      console.log('Socket disconnected')
     })
 
     return () => {
@@ -48,19 +65,22 @@ export const SocketProvider = ({ children }) => {
   }, [user])
 
   const joinConversation = (conversationId) => {
-    if (socketRef.current) {
+    if (socketRef.current && conversationId) {
+      console.log('Joining conversation:', conversationId)
       socketRef.current.emit('join_conversation', conversationId)
     }
   }
 
   const leaveConversation = (conversationId) => {
-    if (socketRef.current) {
+    if (socketRef.current && conversationId) {
+      console.log('Leaving conversation:', conversationId)
       socketRef.current.emit('leave_conversation', conversationId)
     }
   }
 
   const sendMessage = (data) => {
     if (socketRef.current) {
+      console.log('Sending message:', data)
       socketRef.current.emit('send_message', data)
     }
   }
@@ -76,7 +96,7 @@ export const SocketProvider = ({ children }) => {
   }
 
   const isUserOnline = (userId) => {
-    return onlineUsersRef.current.has(userId)
+    return onlineUsers.includes(userId)
   }
 
   const value = {
@@ -85,7 +105,8 @@ export const SocketProvider = ({ children }) => {
     leaveConversation,
     sendMessage,
     emitTyping,
-    isUserOnline
+    isUserOnline,
+    onlineUsers
   }
 
   return (

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { chatService, userService } from '../services/api'
+import { chatService } from '../services/api'
 import ConversationList from '../components/ConversationList'
 import ChatWindow from '../components/ChatWindow'
 import UserSearch from '../components/UserSearch'
+import MobileMenu from '../components/MobileMenu'
+import { Menu } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function Chat() {
@@ -12,6 +14,7 @@ function Chat() {
   const [selectedConversation, setSelectedConversation] = useState(null)
   const [showSearch, setShowSearch] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
 
   useEffect(() => {
     loadConversations()
@@ -36,8 +39,8 @@ function Chat() {
       if (response.data.success) {
         setSelectedConversation(response.data.conversation)
         setShowSearch(false)
+        setShowMobileSidebar(false)
         
-        // Add to conversations if new
         const exists = conversations.find(c => c._id === response.data.conversation._id)
         if (!exists) {
           setConversations([response.data.conversation, ...conversations])
@@ -59,26 +62,39 @@ function Chat() {
     })
   }
 
+  const handleSelectConversation = (conversation) => {
+    setSelectedConversation(conversation)
+    setShowMobileSidebar(false)
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl w-full max-w-7xl h-[90vh] flex overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-96 border-r border-white/20 flex flex-col">
+    <div className="min-h-screen h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-center justify-center p-0 sm:p-4">
+      <div className="bg-white/10 backdrop-blur-lg sm:rounded-3xl shadow-2xl w-full h-full sm:h-[90vh] max-w-7xl flex overflow-hidden relative">
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setShowMobileSidebar(true)}
+          className="lg:hidden absolute top-4 left-4 z-40 p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300"
+        >
+          <Menu className="w-6 h-6 text-white" />
+        </button>
+
+        {/* Left Sidebar - Desktop */}
+        <div className="hidden lg:flex w-80 xl:w-96 border-r border-white/20 flex-col">
           {/* User Header */}
-          <div className="p-6 border-b border-white/20">
+          <div className="p-4 xl:p-6 border-b border-white/20">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-10 h-10 xl:w-12 xl:h-12 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-lg xl:text-xl">
                   {user.displayName[0].toUpperCase()}
                 </div>
-                <div>
-                  <h3 className="text-white font-semibold">{user.displayName}</h3>
-                  <p className="text-white/70 text-sm">@{user.username}</p>
+                <div className="min-w-0">
+                  <h3 className="text-white font-semibold truncate">{user.displayName}</h3>
+                  <p className="text-white/70 text-sm truncate">@{user.username}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowSearch(!showSearch)}
-                className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300"
+                className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300 flex-shrink-0"
                 title="Search users"
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,11 +115,23 @@ function Chat() {
           <ConversationList
             conversations={conversations}
             selectedConversation={selectedConversation}
-            onSelectConversation={setSelectedConversation}
+            onSelectConversation={handleSelectConversation}
             currentUserId={user.id}
             loading={loading}
           />
         </div>
+
+        {/* Mobile Sidebar */}
+        <MobileMenu
+          isOpen={showMobileSidebar}
+          onClose={() => setShowMobileSidebar(false)}
+          user={user}
+          conversations={conversations}
+          selectedConversation={selectedConversation}
+          onSelectConversation={handleSelectConversation}
+          onSelectUser={handleSelectUser}
+          loading={loading}
+        />
 
         {/* Chat Window */}
         {selectedConversation ? (
@@ -111,15 +139,16 @@ function Chat() {
             conversation={selectedConversation}
             currentUser={user}
             onMessageSent={updateConversationList}
+            onBack={() => setShowMobileSidebar(true)}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-4">
             <div className="text-center text-white/70">
-              <svg className="w-24 h-24 mx-auto mb-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <p className="text-xl mb-2">No conversation selected</p>
-              <p className="text-sm">Choose a conversation or search for users to start chatting</p>
+              <p className="text-lg sm:text-xl mb-2">No conversation selected</p>
+              <p className="text-xs sm:text-sm px-4">Choose a conversation or search for users to start chatting</p>
             </div>
           </div>
         )}
