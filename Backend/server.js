@@ -32,6 +32,17 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL || 'https://two-chat.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');      
+  next();
+});
+app.use("/",(req, res) => {
+  res.send("Welcome to Two Chat API");  
+});
+  
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
