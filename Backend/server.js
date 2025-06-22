@@ -39,14 +39,16 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');      
   next();
 });
-app.use("/",(req, res) => {
-  res.send("Welcome to Two Chat API");  
-});
+
   
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/users', userRoutes);
+
+app.use("/",(req, res) => {
+  res.send("Welcome to Two Chat API");  
+});
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/multiuserchat', {
